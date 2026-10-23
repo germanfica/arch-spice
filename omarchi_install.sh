@@ -31,9 +31,9 @@ fi
 
 # Guest daemon. X11 spice-vdagent session process is not started in Wayland.
 if systemctl list-unit-files spice-vdagentd.socket --no-legend 2>/dev/null | grep -q '^spice-vdagentd.socket'; then
-  sudo systemctl enable --now spice-vdagentd.socket
+  sudo systemctl start spice-vdagentd.socket
 elif systemctl list-unit-files spice-vdagentd.service --no-legend 2>/dev/null | grep -q '^spice-vdagentd.service'; then
-  sudo systemctl enable --now spice-vdagentd.service
+  sudo systemctl start spice-vdagentd.service
 else
   warn 'No spice-vdagentd systemd unit found.'
 fi
@@ -41,7 +41,7 @@ fi
 # Only install/start QEMU guest agent when the corresponding virtio port exists.
 if [[ -e /dev/virtio-ports/org.qemu.guest_agent.0 ]]; then
   sudo pacman -S --needed qemu-guest-agent
-  sudo systemctl enable --now qemu-guest-agent.service
+  sudo systemctl start qemu-guest-agent.service
 else
   info 'QEMU guest agent channel not present; skipping qemu-guest-agent.'
 fi
@@ -99,15 +99,11 @@ chmod 755 "$helper"
 # Insert a distinctly delimited, repeatable Omarchy 4 Lua startup hook.
 autostart="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/autostart.lua"
 start_marker='-- BEGIN omarchy-spice-resize (managed)'
-if ! grep -Fq "$start_marker" "$autostart"; then
+if ! grep -Fq -- "$start_marker" "$autostart"; then
   info 'Registering automatic startup in Omarchy 4...'
   cp -a "$autostart" "${autostart}.bak.$(date +%Y%m%d%H%M%S)"
-  cat >> "$autostart" <<'LUA'
-
--- BEGIN omarchy-spice-resize (managed)
-o.launch_on_start("$HOME/.local/bin/omarchy-spice-resize")
--- END omarchy-spice-resize (managed)
-LUA
+  printf '\n-- BEGIN omarchy-spice-resize (managed)\no.launch_on_start(\"%s\")\n-- END omarchy-spice-resize (managed)\n' \
+    "$helper" >> "$autostart"
 else
   info 'Autostart was already configured.'
 fi
